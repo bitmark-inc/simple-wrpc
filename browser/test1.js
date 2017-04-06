@@ -1,7 +1,7 @@
 (function() {
   $(function() {
     var $body = $('body');
-    var connection = new window.WebSocket('ws://192.168.0.106:5051/echo');
+    var connection = new WebSocket('ws:\/\/127.0.0.1:3000\/');
     var appendMessage = function(text) {
       $body.append(text);
       $body.append('<br/>');
@@ -14,18 +14,25 @@
       appendMessage('Connection openned');
       appendMessage('Send Ping');
       connection.send('Ping'); // Send the message 'Ping' to the server
+      setInterval(function() {
+        appendMessage('Send a json object');
+        connection.send(JSON.stringify({name: 'cuong', from: 'Bitmark'}));
+      }, 5000);
     };
 
     // Log errors
     connection.onerror = function (error) {
       appendMessage('Connection has error');
-      console.log('WebSocket Error ' + error);
+      console.log(error);
     };
 
     // Log messages from the server
     connection.onmessage = function (e) {
       appendMessage('Receive message ' + e.data);
-      console.log('Server: ' + e.data);
+    };
+
+    connection.onclose = function(e) {
+      appendMessage('Socket closed');
     };
   });
 
