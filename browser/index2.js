@@ -8,10 +8,6 @@
  * - error // Error can happen during any stages - but the socket still tries to connect to the server if it has not closed
  */
 
-// TODO: Add timeout if ping does not work
-// TODO: Add close signal
-// TODO: fix the case that the reponse is returned not in order but we already remove the elements (and the callback)
-
 (function() {
   var RECONNECT_INTERVAL = 2000;
   var RECONNECT_DECAY = 1.5;
@@ -33,16 +29,20 @@
     RESPONSE: 'res' // res:<id>:<data>
   };
 
-  var PRESERVED_MESSAGE_NAME = {
+  var PRESERVED_MESSAGE_NAME: {
     PING: 'ping',
-    // PONG: 'pong'
+    PONG: 'pong'
   }
 
   var MESSAGE_TYPE = {
-    ONE_WAY: '1',
-    TWO_WAY: '2'
+    ONE_WAY: 1,
+    TWO_WAY: 2
   };
-
+  // var MESSAGE_STATE = {
+  //   INITIALIZED: 0,
+  //   SENT: 1,
+  //   FINISHED: 2
+  // };
   var TIMEOUT = 30000;
   var CALL_TIMEOUT = 10000;
 
@@ -67,7 +67,7 @@
     return (new Date().getTime()) + '-' + Helper.makeRandomString();
   }
 
-  Helper.createEvent = function(name, params) {
+  Helper.generateEvent = function(name, params) {
     return new CustomEvent(name, params)
     // var evt = window.document.createEvent("CustomEvent");
     // evt.initCustomEvent(s, false, false, args);
@@ -92,19 +92,17 @@
    * Message structure
    * {id, content}
    */
-  Helper.MessagePool = function() {
+  Helper.MessagePool() {
     var messages = [];
 
     this.pushMessage = function(message) {
-      if (!message.id) {
+      if (!id) {
         throw new Error('message id is required');
       }
-      if (!message.content) {
+      if (!content) {
         throw new Error('message content is required');
       }
-      console.log('Push message ', message.callback);
-      message.id = message.id.toString(); // make sure the id is string
-      messages.push(message);
+      messages.push({id: id, content: content});
     };
 
     this.removeMessageUntilID = function(id) {
@@ -130,20 +128,17 @@
   Helper.parseMessage = function(messageString) {
     var requestRegExp = new RegExp(
       '^' + MESSAGE_SIGNAL.REQUEST + ':' + // signal
-      '([^:]+):' + // id
-      '(' + MESSAGE_TYPE.ONE_WAY + '|' + MESSAGE_TYPE.TWO_WAY + '):' + // type
-      '([^:]+)' + // name
-      '(?::(.+))?$'); // parameter
+      '(.+):' + // id
+      '(' MESSAGE_TYPE.ONE_WAY + '|' + MESSAGE_TYPE.TWO_WAY '):' + // type
+      '(.+):' + // name
+      '(.+)?$'); // parameter
     var responseRegExp = new RegExp(
       '^' + MESSAGE_SIGNAL.RESPONSE + ':' +
-      '([^:]+)' + // id
-      '(?::(.+))?$'); // data
+      '(.+):' + // id
+      '(.+)$'); // data
 
     var result = responseRegExp.exec(messageString);
     if (result) {
-      try {
-        result[2] = JSON.parse(result[2]);
-      } catch (err) {}
       return {
         signal: MESSAGE_SIGNAL.RESPONSE,
         id: result[1],
@@ -151,30 +146,22 @@
       }
     } else {
       result = requestRegExp.exec(messageString);
-      if (result && (result[2] === MESSAGE_TYPE.ONE_WAY || result[2] === MESSAGE_TYPE.TWO_WAY)) {
-        if (result[4]) {
-          try {
-            result[4] = JSON.parse(result[4]);
-          } catch (err) {}
-        }
-        return {
-          signal: MESSAGE_SIGNAL.REQUEST,
-          id: result[1],
-          type: result[2],
-          name: result[3],
-          data: result[4]
-        };
+      return (result[3] !== MESSAGE_TYPE.ONE_WAY && result[3] !== MESSAGE_TYPE.TWO_WAY) ? null : {
+        signal: MESSAGE_SIGNAL.REQUEST,
+        id: result[1],
+        type: result[2],
+        name: result[3],
+        data: result[4]
       }
-      return null;
     }
   };
 
   Helper.buildRequestMessage = function(id, type, name, params) {
-    return MESSAGE_SIGNAL.REQUEST + ':' + id + ':' + type + ':' + name + (params ? ':' + JSON.stringify(params) : '');
+    return MESSAGE_SIGNAL.REQUEST + ':' + id + ':' + type + ':' + name + ':' + JSON.stringify(params);
   };
 
   Helper.buildReponseMessage = function(id, data) {
-    return MESSAGE_SIGNAL.RESPONSE + ':' + id + (data ? ':' + JSON.stringify(data) : '');
+    return MESSAGE_SIGNAL.RESPONSE + ':' + id + ':' + data;
   };
 
 
@@ -200,7 +187,6 @@
     this.reconnectTimer = null;
     this.connection = null;
     this.state = STATE.UNAVAILABLE;
-    this.id = Helper.createID();
 
     var messagePool = new Helper.MessagePool();
     var lastSuccess = 0;
@@ -211,7 +197,7 @@
         content: content,
         callback
       });
-      self.connection.send(content);
+      // TODO: send the message away
     };
 
     //----------------------------------------------------
@@ -227,26 +213,12 @@
       sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.TWO_WAY, name, params), callback);
     };
 
-    function sendPingRequest() {
-      console.log('SEND PING', new Error().stack);
-      var id = new Date().getTime();
-      sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING));
-    }
-
-    var pingTimer;
     function onReceivingResponse(response) {
-      console.log('--');
-      console.log(response);
-      console.log(JSON.stringify(messagePool.getMessages()))
       var message = messagePool.getMessage(response.id);
-      console.log(message);
       if (message.callback) {
         message.callback(response.data);
       }
-      // receiving response means other messages before the corresponding requests are sent
       messagePool.removeMessageUntilID(response.id);
-      window.clearTimeout(pingTimer);
-      pingTimer = setTimeout(sendPingRequest, TIMEOUT);
     }
 
     //----------------------------------------------------
@@ -264,7 +236,7 @@
       switch (request.type) {
         case MESSAGE_TYPE.ONE_WAY:
           dataEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
-          sendMessage(request.id, Helper.buildReponseMessage(request.id));
+          sendMessage(request.id, Helper.buildReponseMessage(request.id, {ok: true}));
         case MESSAGE_TYPE.TWO_WAY:
           request.data = request.data || {};
           request.data.done = function(data) {
@@ -274,20 +246,22 @@
       }
     }
 
-    //----------------------------------------------------
-    //GROUP OF FUNCTIONS FOR DRIVING INCOMING MESSAGES
-
-    var requestIDsReceived = []; // To prevent receiving duplicate request
-    var responseIDsReceived = []; // To prevent receiving duplicate response
+    var timer;
+    function onReceivingAliveSignal(message) {
+      window.clearTimeout(timer);
+      timer = setTimeout(function(){
+        var id = Helper.createID();
+        sendMessage(id, Helper.buildReponseMessage(id, MESSAGE_TYPE.TWO_WAY, PRESERVED_MESSAGE_NAME.PING));
+      }, TIMEOUT);
+    }
 
     /**
      * The ping pong method is a mechanism to d
      */
     function addReceivingMessageHandler() {
-      var connection = self.connection;
+      var connection = this.connection;
 
       function onReceivingMessage(event) {
-        console.log(event);
         var message = Helper.parseMessage(event.data);
         if (!message) {
           console.warn('ignore message because of unrecognized type', message);
@@ -297,15 +271,11 @@
         // it means all the messages before that have been sent
         switch (message.signal) {
           case MESSAGE_SIGNAL.REQUEST:
-            if (requestIDsReceived.indexOf(message.id) === -1) {
-              onReceivingRequest(message);
-              requestIDsReceived.push(message.id);
-            }
-            break;
+            onReceivingRequest(message)
           case MESSAGE_SIGNAL.RESPONSE:
-            if (responseIDsReceived.indexOf(message.id) === -1) {
+            onReceivingAliveSignal(message);
+            if (message.name !== PRESERVED_MESSAGE_NAME.PONG) {
               onReceivingResponse(message);
-              responseIDsReceived.push(message.id);
             }
             break;
         }
@@ -336,7 +306,7 @@
          * @param  {Event} e
          */
         var onErrorBeforeOpening = function(e) {
-          self.dispatchEvent(Helper.createEvent(EVENT.ERROR, e));
+          self.dispatchEvent(Helper.generateEvent(EVENT.ERROR, e));
           self.connection.close();
           createSocket(url, isFirst, self.reconnectScheduler.getTime());
         };
@@ -353,13 +323,14 @@
             self.connection.removeEventListener('close', onSocketClose);
             self.connection.removeEventListener('open', onSocketOpen);
             removeMessageHandler();
-            self.dispatchEvent(Helper.createEvent(EVENT.DISCONNECT, e));
+            self.dispatchEvent(Helper.generateEvent(EVENT.DISCONNECT, e));
             self.connection.close();
+            messagePool.setAllToUnsent();
             createSocket(url, false, self.reconnectScheduler.getTime());
           };
 
           var onErrorAfterOpening = function(e) {
-            self.dispatchEvent(Helper.createEvent(EVENT.ERROR, e));
+            self.dispatchEvent(Helper.generateEvent(EVENT.ERROR));
             onSocketDisconnect(e);
           };
 
@@ -377,17 +348,10 @@
           self.connection.addEventListener('close', onSocketClose);
           self.connection.addEventListener('timeout', onTimeout); // this event is used to detect connection lost better
           removeMessageHandler = addReceivingMessageHandler(self.connection);
+          // TODO: add a lot of event
 
-          self.dispatchEvent(Helper.createEvent(isFirst ? EVENT.OPEN : EVENT.RECONNECT, e));
+          self.dispatchEvent(Helper.generateEvent(isFirst ? EVENT.OPEN : EVENT.RECONNECT, e));
           self.reconnectScheduler.reset();
-
-          // Resend all the messages that is left from the last connection if any
-          messagePool.getMessages().forEach(function(message) {
-            self.connection.send(message.content);
-          });
-
-          self.connection.send(self.id);
-          sendPingRequest();
         };
 
         self.connection.addEventListener('open', onSocketOpen);
@@ -401,4 +365,4 @@
 
   window.BitmarkRPCWebsocket = BitmarkRPCWebsocket;
 
-})();
+});

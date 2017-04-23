@@ -1,16 +1,12 @@
-var WebsocketServer = require('./index.js').Server;
+var BitmarkRPCWebsocketServer = require('./index.js').Server;
 
-var wss = new WebsocketServer({port: 3000});
+var bitmarkRPC = new BitmarkRPCWebsocketServer({port: 3000});
 
-function onMessage(message) {
-    console.log('received: ' + message);
-}
-
-function onClose() {
-  console.log('socket is closed');
-}
-
-wss.on('connection', function(ws) {
-    ws.on('message', onMessage);
-    ws.on('close', onClose);
+bitmarkRPC.on('connection', function(conn) {
+  conn.addListenerForData('mydata', function(data) {
+    console.log('I JUST RECEIVED MYDATA WITH DATA', data);
+  });
+  conn.addListenerForMethodCall('mymethod', function(event) {
+    event.done({data: 'aaabc'});
+  });
 });

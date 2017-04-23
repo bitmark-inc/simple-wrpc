@@ -34,6 +34,19 @@
     connection.onclose = function(e) {
       appendMessage('Socket closed');
     };
+
+    setInterval(function() {
+      console.log(connection.bufferedAmount);
+    }, 3000);
+
+
+    // var eventTarget = document.createElement('div');
+    // var event = new CustomEvent('build', {somedata: 'data'});
+    // eventTarget.addEventListener('build', function() {
+    //   console.log('AAAAAA');
+    // });
+    // eventTarget.dispatchEvent(event);
+    // window.aaa = eventTarget;
   });
 
 })();
