@@ -67,11 +67,15 @@
     return (new Date().getTime()) + '-' + Helper.makeRandomString();
   }
 
+  Helper.SequenceID = function() {
+    var sequenceID = 0;
+    this.get = function() {
+      return ++sequenceID;
+    }
+  }
+
   Helper.createEvent = function(name, params) {
-    return new CustomEvent(name, params)
-    // var evt = window.document.createEvent("CustomEvent");
-    // evt.initCustomEvent(s, false, false, args);
-    // return evt;
+    return new CustomEvent(name, {detail: params})
   };
 
   Helper.TimeDecay = function(intervalInput, decayInput) {
@@ -94,16 +98,20 @@
    */
   Helper.MessagePool = function() {
     var messages = [];
+    var callback = {};
 
     this.pushMessage = function(message) {
       if (!message.id) {
         throw new Error('message id is required');
       }
+      if (!message.signal) {
+        throw new Error('message signal is required');
+      }
       if (!message.content) {
         throw new Error('message content is required');
       }
-      console.log('Push message ', message.callback);
       message.id = message.id.toString(); // make sure the id is string
+      callback[message.id] = message.callback;
       messages.push(message);
     };
 
@@ -124,6 +132,13 @@
       return messages.find(function(message) {
         return message.id === id;
       });
+    };
+
+    this.callCallback = function(id, error, result) {
+      if (callback[id]) {
+        callback[id].call(undefined, error, result);
+        delete callback[id];
+      }
     };
   };
 
@@ -201,13 +216,16 @@
     this.connection = null;
     this.state = STATE.UNAVAILABLE;
     this.id = Helper.createID();
+    this.sequenceID = new Helper.SequenceID();
 
     var messagePool = new Helper.MessagePool();
     var lastSuccess = 0;
 
-    function sendMessage(id, content, callback) {
+    function sendMessage(id, signal, content, callback) {
+      console.log('SEND ' + content + ' AT ' + new Date().getTime());
       messagePool.pushMessage({
         id: id,
+        signal: signal,
         content: content,
         callback
       });
@@ -218,31 +236,30 @@
     // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
     this.sendData = function(name, params, callback) {
-      var id = Helper.createID();
-      sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params), callback);
+      var id = self.sequenceID.get();
+      var signal = MESSAGE_SIGNAL.REQUEST;
+      var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
+      sendMessage(id, signal, content, callback);
     };
 
     this.callMethod = function(name, params, callback) {
-      var id = Helper.createID();
-      sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.TWO_WAY, name, params), callback);
+      var id = self.sequenceID.get();
+      var signal = MESSAGE_SIGNAL.REQUEST;
+      var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.TWO_WAY, name, params)
+      sendMessage(id, signal, content, callback);
     };
 
     function sendPingRequest() {
-      console.log('SEND PING', new Error().stack);
-      var id = new Date().getTime();
-      sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING));
+      var id = self.sequenceID.get();
+      var signal = MESSAGE_SIGNAL.REQUEST;
+      var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING);
+      sendMessage(id, signal, content);
     }
 
     var pingTimer;
     function onReceivingResponse(response) {
-      console.log('--');
       console.log(response);
-      console.log(JSON.stringify(messagePool.getMessages()))
-      var message = messagePool.getMessage(response.id);
-      console.log(message);
-      if (message.callback) {
-        message.callback(response.data);
-      }
+      messagePool.callCallback(response.id, null, response.data);
       // receiving response means other messages before the corresponding requests are sent
       messagePool.removeMessageUntilID(response.id);
       window.clearTimeout(pingTimer);
@@ -264,11 +281,11 @@
       switch (request.type) {
         case MESSAGE_TYPE.ONE_WAY:
           dataEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
-          sendMessage(request.id, Helper.buildReponseMessage(request.id));
+          sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
         case MESSAGE_TYPE.TWO_WAY:
           request.data = request.data || {};
           request.data.done = function(data) {
-            sendMessage(request.id, Helper.buildReponseMessage(request.id, data));
+            sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
           };
           methodCallEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
       }
@@ -287,7 +304,7 @@
       var connection = self.connection;
 
       function onReceivingMessage(event) {
-        console.log(event);
+        console.log('RECEIVE ' + event.data + ' AT ' + new Date().getTime());
         var message = Helper.parseMessage(event.data);
         if (!message) {
           console.warn('ignore message because of unrecognized type', message);

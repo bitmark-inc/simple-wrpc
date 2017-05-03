@@ -55,21 +55,33 @@ Helper.createID = function() {
   return (new Date().getTime()) + '-' + Helper.makeRandomString();
 };
 
+Helper.SequenceID = function() {
+  var sequenceID = 0;
+  this.get = function() {
+    return ++sequenceID;
+  }
+}
+
 /**
  * Message structure
  * {id, content}
  */
 Helper.MessagePool = function() {
   var messages = [];
+  var callback = {};
 
   this.pushMessage = function(message) {
     if (!message.id) {
       throw new Error('message id is required');
     }
+    if (!message.signal) {
+      throw new Error('message signal is required');
+    }
     if (!message.content) {
       throw new Error('message content is required');
     }
-    message.id = message.id.toString();
+    message.id = message.id.toString(); // make sure the id is string
+    callback[message.id] = message.callback;
     messages.push(message);
   };
 
@@ -90,6 +102,13 @@ Helper.MessagePool = function() {
     return messages.find(function(message) {
       return message.id === id;
     });
+  };
+
+  this.callCallback = function(id, error, result) {
+    if (callback[id]) {
+      callback[id].call(undefined, error, result);
+      delete callback[id];
+    }
   };
 };
 
@@ -143,18 +162,18 @@ Helper.buildReponseMessage = function(id, data) {
   return MESSAGE_SIGNAL.RESPONSE + ':' + id + (data ? ':' + JSON.stringify(data) : '');
 };
 
-
-
 var BitmarkRPCWebsocket = function(connection) {
   var self = this;
   var messagePool = new Helper.MessagePool();
 
+  this.sequenceID = new Helper.SequenceID();
   this.connection = null;
 
-  function sendMessage(id, content, callback) {
-    console.log('SEND MESSAGE', content);
+  function sendMessage(id, signal, content, callback) {
+    console.log('SEND ' + content + ' AT ' + new Date().getTime());
     messagePool.pushMessage({
       id: id,
+      signal: signal,
       content: content,
       callback
     });
@@ -165,29 +184,32 @@ var BitmarkRPCWebsocket = function(connection) {
   // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
   this.sendData = function(name, params, callback) {
-    var id = Helper.createID();
-    sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params), callback);
+    var id = self.sequenceID.get();
+    var signal = MESSAGE_SIGNAL.REQUEST;
+    var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
+    sendMessage(id, signal, content, callback);
   };
 
   this.callMethod = function(name, params, callback) {
-    var id = Helper.createID();
-    sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.TWO_WAY, name, params), callback);
+    var id = self.sequenceID.get();
+    var signal = MESSAGE_SIGNAL.REQUEST;
+    var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.TWO_WAY, name, params)
+    sendMessage(id, signal, content, callback);
   };
 
   function sendPingRequest() {
-    var id = new Date().getTime();
-    sendMessage(id, Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING));
+    var id = self.sequenceID.get();
+    var signal = MESSAGE_SIGNAL.REQUEST;
+    var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING);
+    sendMessage(id, signal, content);
   }
 
   var pingTimer;
   function onReceivingResponse(response) {
-    var message = messagePool.getMessage(response.id);
-    if (message.callback) {
-      message.callback(response.data);
-    }
+    messagePool.callCallback(response.id, null, response.data);
     // receiving response means other messages before the corresponding requests are sent
     messagePool.removeMessageUntilID(response.id);
-    window.clearTimeout(pingTimer);
+    clearTimeout(pingTimer);
     pingTimer = setTimeout(sendPingRequest, TIMEOUT);
   }
 
@@ -206,11 +228,11 @@ var BitmarkRPCWebsocket = function(connection) {
     switch (request.type) {
       case MESSAGE_TYPE.ONE_WAY:
         dataEventTarget.emit(request.name, request.data);
-        sendMessage(request.id, Helper.buildReponseMessage(request.id));
+        sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
       case MESSAGE_TYPE.TWO_WAY:
         request.data = request.data || {};
         request.data.done = function(data) {
-          sendMessage(request.id, Helper.buildReponseMessage(request.id, data));
+          sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
         };
         methodCallEventTarget.emit(request.name, request.data);
     }
@@ -229,8 +251,7 @@ var BitmarkRPCWebsocket = function(connection) {
     var connection = self.connection;
 
     function onReceivingMessage(message) {
-      console.log('===== RECEIVED MESSAGE');
-      console.log(message);
+      console.log('RECEIVE ' + message + ' AT ' + new Date().getTime());
       var message = Helper.parseMessage(message);
       if (!message) {
         console.warn('ignore message because of unrecognized type', message);
@@ -238,12 +259,8 @@ var BitmarkRPCWebsocket = function(connection) {
       }
       // If the socket receives the response data or pong data
       // it means all the messages before that have been sent
-      console.log('==== PARSE IT TO');
-      console.log(message);
       switch (message.signal) {
         case MESSAGE_SIGNAL.REQUEST:
-          console.log('RECEIVE REQUEST');
-          console.log(message);
           if (requestIDsReceived.indexOf(message.id) === -1) {
             onReceivingRequest(message);
             requestIDsReceived.push(message.id);
@@ -304,7 +321,6 @@ var BitmarkRPCWebsocket = function(connection) {
       self.connection.send(message.content);
     });
 
-    self.connection.send(self.id);
   };
 
   this.setConnection(connection);
@@ -328,6 +344,7 @@ var BitmarkRPCWebsocketServer = function(options) {
       }
     }
     connection.on('message', waitingForID);
+
     // var eventSystem = new EventEmitter(); // an attempt for allow multiple event listeners for uws
     // connection = eventSystem;
     // connection.on('message', eventSystem.emit.bind(eventSystem, 'message'));

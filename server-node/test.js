@@ -9,4 +9,7 @@ bitmarkRPC.on('connection', function(conn) {
   conn.addListenerForMethodCall('mymethod', function(event) {
     event.done({data: 'aaabc'});
   });
+  conn.sendData('datafromserver', {a: 'aaa', b: 'bbb'}, function() {
+    console.log('Sent');
+  });
 });
