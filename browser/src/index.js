@@ -204,10 +204,10 @@
   var BitmarkRPCWebsocket = function(url, options) {
     var self = this;
     // Event system for BitmarkRPCWebsocket object
-    var eventTarget = document.createElement('div');
-    this.on = eventTarget.addEventListener.bind(eventTarget);
-    this.off = eventTarget.removeEventListener.bind(eventTarget);
-    this.dispatchEvent = eventTarget.dispatchEvent.bind(eventTarget);
+    var socketEventTarget = document.createElement('div');
+    this.on = socketEventTarget.addEventListener.bind(socketEventTarget);
+    this.off = socketEventTarget.removeEventListener.bind(socketEventTarget);
+    this.dispatchEvent = socketEventTarget.dispatchEvent.bind(socketEventTarget);
 
     // BitmarkRPCWebsocket attribute
     options = options || {};
@@ -235,7 +235,7 @@
     //----------------------------------------------------
     // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
-    this.sendData = function(name, params, callback) {
+    this.emitEvent = function(name, params, callback) {
       var id = self.sequenceID.get();
       var signal = MESSAGE_SIGNAL.REQUEST;
       var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
@@ -269,18 +269,18 @@
     //----------------------------------------------------
     //GROUP OF FUNCTIONS FOR RECEIVING REQUEST
 
-    var dataEventTarget = document.createElement('div');
-    this.addListenerForData = dataEventTarget.addEventListener.bind(dataEventTarget);
-    this.removeListenerForData = dataEventTarget.removeEventListener.bind(dataEventTarget);
+    var subscriptionEventTarget = document.createElement('div');
+    this.subscribeToEvent = subscriptionEventTarget.addEventListener.bind(subscriptionEventTarget);
+    this.unsubscribeToEvent = subscriptionEventTarget.removeEventListener.bind(subscriptionEventTarget);
 
     var methodCallEventTarget = document.createElement('div');
-    this.addListenerForMethodCall = methodCallEventTarget.addEventListener.bind(methodCallEventTarget);
+    this.addListenerToMethodCall = methodCallEventTarget.addEventListener.bind(methodCallEventTarget);
     this.removeListenerForMethodCall = methodCallEventTarget.removeEventListener.bind(methodCallEventTarget);
 
     function onReceivingRequest(request) {
       switch (request.type) {
         case MESSAGE_TYPE.ONE_WAY:
-          dataEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
+          subscriptionEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
           sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
         case MESSAGE_TYPE.TWO_WAY:
           request.data = request.data || {};

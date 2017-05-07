@@ -183,7 +183,7 @@ var BitmarkRPCWebsocket = function(connection) {
   //----------------------------------------------------
   // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
-  this.sendData = function(name, params, callback) {
+  this.emitEvent = function(name, params, callback) {
     var id = self.sequenceID.get();
     var signal = MESSAGE_SIGNAL.REQUEST;
     var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
@@ -216,18 +216,18 @@ var BitmarkRPCWebsocket = function(connection) {
   //----------------------------------------------------
   //GROUP OF FUNCTIONS FOR RECEIVING REQUEST
 
-  var dataEventTarget = new EventEmitter();
-  this.addListenerForData = dataEventTarget.on.bind(dataEventTarget);
-  this.removeListenerForData = dataEventTarget.removeListener.bind(dataEventTarget);
+  var subscriptionEventTarget = new EventEmitter();
+  this.subscribeToEvent = subscriptionEventTarget.on.bind(subscriptionEventTarget);
+  this.unsubscribeToEvent = subscriptionEventTarget.removeListener.bind(subscriptionEventTarget);
 
   var methodCallEventTarget = new EventEmitter();
-  this.addListenerForMethodCall = methodCallEventTarget.on.bind(methodCallEventTarget);
+  this.addListenerToMethodCall = methodCallEventTarget.on.bind(methodCallEventTarget);
   this.removeListenerForMethodCall = methodCallEventTarget.removeListener.bind(methodCallEventTarget);
 
   function onReceivingRequest(request) {
     switch (request.type) {
       case MESSAGE_TYPE.ONE_WAY:
-        dataEventTarget.emit(request.name, request.data);
+        subscriptionEventTarget.emit(request.name, request.data);
         sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
       case MESSAGE_TYPE.TWO_WAY:
         request.data = request.data || {};
