@@ -1,46 +1,38 @@
 let chai = require('chai');
 let expect = chai.expect;
 
-// Run browser test by karma
-let path = require('path');
-let cfg = require('karma').config;
-let karmaConfig = cfg.parseConfig(path.resolve('./karma.conf.js'));
-let KarmaServer = require('karma').Server
-let karmaServer = new KarmaServer(karmaConfig, function(exitCode) {
-  // console.log('Karma has exited with ' + exitCode)
-  // process.exit(exitCode)
-});
-
-
 let nodeServer = require('../server-node');
 let SimpleWRPCServer = nodeServer.Server;
 let wrpcServer = new SimpleWRPCServer({port: 8123});
 
 describe('Test Websocket module with Nodejs Server and Chrome Browser Client', function() {
   let conn = null;
-
   this.timeout(120000);
-  it('Allow the client to connect to the server', function(done) {
-    this.timeout(5000);
+
+  it('Allow the client to connect/close the connection to the server', function(done) {
     wrpcServer.on('connection', function(WRPCClient) {
       conn = WRPCClient;
-      done();
-    });
-    karmaServer.start();
-  });
-
-  it('Can send the signal to start Test1', function(done) {
-    conn.subscribeToEvent('test1', function() {
-      done();
+      console.log('Connection is opened');
+      conn.on('close', function() {
+        console.log('SHOULD CLODE');
+      });
     });
   });
 
-  it('Can receive the event', function(done) {
-    conn.emitEvent('test1-receiving-event', {greeting: "hi! I am websocket server"}, function(error) {
-      expect(error).to.not.be.ok
-      done();
-    });
-  });
+  // it('Can send the signal to start Test1', function(done) {
+  //   console.log('aaaa');
+  //   conn.subscribeToEvent('test1', function() {
+  //     console.log('bbbb');
+  //     done();
+  //   });
+  // });
+
+  // it('Can receive the event', function(done) {
+  //   conn.emitEvent('test1-receiving-event', {greeting: "hi! I am websocket server"}, function(error) {
+  //     expect(error).to.not.be.ok
+  //     done();
+  //   });
+  // });
 
   // describe('Test1', function() {
   //   it('should allow me to test1', function() {

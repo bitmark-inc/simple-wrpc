@@ -23,7 +23,7 @@ var MESSAGE_SIGNAL = {
 
 var PRESERVED_MESSAGE_NAME = {
   PING: 'ping',
-  PONG: 'pong'
+  CLOSE: 'close'
 }
 
 var MESSAGE_TYPE = {
@@ -162,7 +162,7 @@ Helper.buildReponseMessage = function(id, data) {
   return MESSAGE_SIGNAL.RESPONSE + ':' + id + (data ? ':' + JSON.stringify(data) : '');
 };
 
-var BitmarkRPCWebsocket = function(connection) {
+var SimpleWRPC = function(connection) {
   var self = this;
   var messagePool = new Helper.MessagePool();
 
@@ -325,12 +325,12 @@ var BitmarkRPCWebsocket = function(connection) {
 
   this.setConnection(connection);
 };
-util.inherits(BitmarkRPCWebsocket, EventEmitter);
+util.inherits(SimpleWRPC, EventEmitter);
 
-var BitmarkRPCWebsocketServer = function(options) {
+var SimpleWRPCServer = function(options) {
   var self = this;
   var wss = new WebSocketServer(options);
-  var idMap = {}; // string - BitmarkRPCWebsocket
+  var idMap = {}; // string - SimpleWRPC
 
   wss.on('connection', function(connection) {
     function waitingForID(id) {
@@ -339,7 +339,7 @@ var BitmarkRPCWebsocketServer = function(options) {
       if (idMap[id]) {
         idMap[id].setConnection(connection);
       } else {
-        idMap[id] = new BitmarkRPCWebsocket(connection);
+        idMap[id] = new SimpleWRPC(connection);
         self.emit('connection', idMap[id]);
       }
     }
@@ -355,8 +355,8 @@ var BitmarkRPCWebsocketServer = function(options) {
   });
 };
 
-util.inherits(BitmarkRPCWebsocketServer, EventEmitter);
+util.inherits(SimpleWRPCServer, EventEmitter);
 
 module.exports = {
-  Server: BitmarkRPCWebsocketServer
+  Server: SimpleWRPCServer
 };

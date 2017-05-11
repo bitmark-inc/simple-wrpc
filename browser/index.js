@@ -201,15 +201,15 @@
    *   reconnect_decay
    * }
    */
-  var BitmarkRPCWebsocket = function(url, options) {
+  var SimpleWRPC = function(url, options) {
     var self = this;
-    // Event system for BitmarkRPCWebsocket object
+    // Event system for SimpleWRPC object
     var socketEventTarget = document.createElement('div');
     this.on = socketEventTarget.addEventListener.bind(socketEventTarget);
     this.off = socketEventTarget.removeEventListener.bind(socketEventTarget);
     this.dispatchEvent = socketEventTarget.dispatchEvent.bind(socketEventTarget);
 
-    // BitmarkRPCWebsocket attribute
+    // SimpleWRPC attribute
     options = options || {};
     this.reconnectScheduler = new Helper.TimeDecay(options.reconnect_interval, options.reconnect_decay);
     this.reconnectTimer = null;
@@ -416,6 +416,6 @@
     createSocket(url, true, 0);
   };
 
-  window.BitmarkRPCWebsocket = BitmarkRPCWebsocket;
+  window.SimpleWRPC = SimpleWRPC;
 
 })();

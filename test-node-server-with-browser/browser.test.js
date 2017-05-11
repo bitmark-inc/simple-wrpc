@@ -1,12 +1,20 @@
-describe('CLIENT Test1', function() {
+describe('Test Websocket module with Nodejs Server and Chrome Browser Client', function() {
+  let wrpc;
   this.timeout(120000);
-  it('should allow me to test1', function() {
-    expect(1).to.equal(1);
+
+  it('should be able to connect/close the connection to the websocket server', function(done) {
+    wrpc = new SimpleWRPC('ws:\/\/127.0.0.1:8123\/');
+    wrpc.on('open', function() {
+      wrpc.close();
+      done();
+    });
   });
-  it('should allow me to test2', function() {
-    expect(2).to.equal(2);
-  });
-  it('should wait 10 seconds', function(done) {
-    setTimeout(done, 10000);
-  });
+
+  // it('should be able to finish the test1', function(done) {
+  //   wrpc.emitEvent('test1');
+  //   wrpc.subscribeToEvent('test1-receiving-event', function(data) {
+  //     expect(data).to.deep.equal({greeting: "hi! I am websocket server"});
+  //     done();
+  //   });
+  // });
 });
