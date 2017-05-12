@@ -24,9 +24,11 @@
     ERROR: 'error'
   };
   var STATE = {
-    UNAVAILABLE: 'unavailable',
-    AVAILABLE: 'available',
-    CLOSED: 'closed'
+    CONNECTING: 1,
+    OPEN: 2,
+    RECONNECTING: 3,
+    CLOSING: 4,
+    CLOSED: 5
   };
   var MESSAGE_SIGNAL = {
     REQUEST: 'req', // req:<id>:<type>:<name>:<params>
@@ -35,7 +37,7 @@
 
   var PRESERVED_MESSAGE_NAME = {
     PING: 'ping',
-    // PONG: 'pong'
+    CLOSE: 'close'
   }
 
   var MESSAGE_TYPE = {
@@ -214,7 +216,7 @@
     this.reconnectScheduler = new Helper.TimeDecay(options.reconnect_interval, options.reconnect_decay);
     this.reconnectTimer = null;
     this.connection = null;
-    this.state = STATE.UNAVAILABLE;
+    this.readyState = STATE.CONNECTING;
     this.id = Helper.createID();
     this.sequenceID = new Helper.SequenceID();
 
@@ -222,6 +224,10 @@
     var lastSuccess = 0;
 
     function sendMessage(id, signal, content, callback) {
+      if (self.readyState === STATE.CLOSE) {
+        console.warn('Cannot send message because the socket was closed: ', content);
+        return;
+      }
       console.log('SEND ' + content + ' AT ' + new Date().getTime());
       messagePool.pushMessage({
         id: id,
@@ -277,11 +283,16 @@
     this.addListenerToMethodCall = methodCallEventTarget.addEventListener.bind(methodCallEventTarget);
     this.removeListenerForMethodCall = methodCallEventTarget.removeEventListener.bind(methodCallEventTarget);
 
+    // Subscribe to the request to close the socket from the server
+    this.subscribeToEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
+      self.close(true);
+    });
+
     function onReceivingRequest(request) {
       switch (request.type) {
         case MESSAGE_TYPE.ONE_WAY:
-          subscriptionEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
           sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
+          subscriptionEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
         case MESSAGE_TYPE.TWO_WAY:
           request.data = request.data || {};
           request.data.done = function(data) {
@@ -334,6 +345,32 @@
       };
     };
 
+    //--------------------------------------------------------
+    //GROUP OF FUNCTIONS FOR BINDING TO THE CURRENT CONNECTION
+
+    function sendCloseRequest(callback) {
+      var id = self.sequenceID.get();
+      var signal = MESSAGE_SIGNAL.REQUEST;
+      var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.CLOSE);
+      sendMessage(id, signal, content, callback);
+    }
+
+    self.close = function(silent) {
+      // Clear the timer to prevent a reconnect later
+      if (self.reconnectTimer) {
+        window.clearTimeout(self.reconnectTimer)
+      }
+      var close = function() {
+        self.connection.close();
+        self.dispatchEvent(Helper.createEvent(EVENT.CLOSE, {}))
+      }
+      if (silent || self.readyState !== STATE.OPEN) {
+        close();
+      } else {
+        sendCloseRequest(close);
+      }
+      self.readyState = STATE.CLOSE;
+    }
 
 
     /**
@@ -360,6 +397,14 @@
 
         var onSocketOpen = function(e) {
           var removeMessageHandler = null;
+
+          if (self.readyState === STATE.CLOSE) {
+            // In case the close method is called while the socket is trying to open
+            self.connection.close();
+            return;
+          } else {
+            self.readyState = STATE.OPEN;
+          }
           /**
            * If the socket discoonect (after connected successfully)
            * We remove all event listeners, close the socket and create a new one
@@ -372,7 +417,11 @@
             removeMessageHandler();
             self.dispatchEvent(Helper.createEvent(EVENT.DISCONNECT, e));
             self.connection.close();
-            createSocket(url, false, self.reconnectScheduler.getTime());
+            if (self.readyState !== STATE.CLOSE) {
+              // if close method is not called, just re-open the connection
+              self.readyState = STATE.RECONNECTING;
+              createSocket(url, false, self.reconnectScheduler.getTime());
+            }
           };
 
           var onErrorAfterOpening = function(e) {

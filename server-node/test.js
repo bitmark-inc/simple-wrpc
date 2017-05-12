@@ -12,4 +12,7 @@ bitmarkRPC.on('connection', function(conn) {
   conn.emitEvent('datafromserver', {a: 'aaa', b: 'bbb'}, function() {
     console.log('Sent');
   });
+  setTimeout(function() {
+    conn.close();
+  }, 5000);
 });

@@ -12,8 +12,7 @@ var EVENT = {
   ERROR: 'error'
 };
 var STATE = {
-  UNAVAILABLE: 'unavailable',
-  AVAILABLE: 'available',
+  OPEN: 1,
   CLOSED: 'closed'
 };
 var MESSAGE_SIGNAL = {
@@ -168,8 +167,13 @@ var SimpleWRPC = function(connection) {
 
   this.sequenceID = new Helper.SequenceID();
   this.connection = null;
+  this.readyState = STATE.OPEN;
 
   function sendMessage(id, signal, content, callback) {
+    if (self.readyState === STATE.CLOSE) {
+      console.warn('Cannot send message because the socket was closed: ', content);
+      return;
+    }
     console.log('SEND ' + content + ' AT ' + new Date().getTime());
     messagePool.pushMessage({
       id: id,
@@ -224,11 +228,16 @@ var SimpleWRPC = function(connection) {
   this.addListenerToMethodCall = methodCallEventTarget.on.bind(methodCallEventTarget);
   this.removeListenerForMethodCall = methodCallEventTarget.removeListener.bind(methodCallEventTarget);
 
+  // Subscribe to the request to close the socket from the server
+  this.subscribeToEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
+    self.close(true);
+  });
+
   function onReceivingRequest(request) {
     switch (request.type) {
       case MESSAGE_TYPE.ONE_WAY:
-        subscriptionEventTarget.emit(request.name, request.data);
         sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
+        subscriptionEventTarget.emit(request.name, request.data);
       case MESSAGE_TYPE.TWO_WAY:
         request.data = request.data || {};
         request.data.done = function(data) {
@@ -281,7 +290,37 @@ var SimpleWRPC = function(connection) {
     };
   };
 
+  //--------------------------------------------------------
+  //GROUP OF FUNCTIONS FOR BINDING TO THE CURRENT CONNECTION
+
+  function sendCloseRequest(callback) {
+    var id = self.sequenceID.get();
+    var signal = MESSAGE_SIGNAL.REQUEST;
+    var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.CLOSE);
+    sendMessage(id, signal, content, callback);
+  }
+
+  self.close = function(silent) {
+    var close = function() {
+      self.connection.close();
+      self.emit(EVENT.CLOSE);
+    }
+    if (silent || self.readyState !== STATE.OPEN) {
+      close();
+    } else {
+      sendCloseRequest(close);
+    }
+    self.readyState = STATE.CLOSE;
+  }
+
+  // this function can be called to replace the old websocket
   this.setConnection = function(connection) {
+
+    if (self.readyState === STATE.CLOSE) {
+      console.warn('Cannot set connection because it was closed');
+      return;
+    }
+
     self.connection = connection;
     var removeMessageHandler = null;
     /**

@@ -1,7 +1,7 @@
 (function() {
   $(function() {
 
-    var socket = new BitmarkRPCWebsocket('ws:\/\/127.0.0.1:3000\/');
+    var socket = new SimpleWRPC('ws:\/\/127.0.0.1:3000\/');
 
     socket.subscribeToEvent('datafromserver', function(e) {
       console.log('Receive data from server', e.detail);
@@ -19,6 +19,10 @@
         console.log('Receive back data', data);
       });
     }, 4000);
+
+    setTimeout(function() {
+      socket.close();
+    }, 2000);
 
   });
 })();
