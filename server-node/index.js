@@ -80,7 +80,9 @@ Helper.MessagePool = function() {
       throw new Error('message content is required');
     }
     message.id = message.id.toString(); // make sure the id is string
-    callback[message.id] = message.callback;
+    if (message.callback) {
+      callback[message.id] = message.callback;
+    }
     messages.push(message);
   };
 
@@ -179,7 +181,7 @@ var SimpleWRPC = function(connection) {
       id: id,
       signal: signal,
       content: content,
-      callback
+      callback: callback
     });
     self.connection.send(content);
   };
@@ -187,8 +189,9 @@ var SimpleWRPC = function(connection) {
   //----------------------------------------------------
   // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
-  this.emitEvent = function(name, params, callback) {
+  this.publishEvent = function(name, params, callback) {
     var id = self.sequenceID.get();
+    console.log('EVENT ID', id);
     var signal = MESSAGE_SIGNAL.REQUEST;
     var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
     sendMessage(id, signal, content, callback);
@@ -202,7 +205,11 @@ var SimpleWRPC = function(connection) {
   };
 
   function sendPingRequest() {
+    if (self.readyState === STATE.CLOSE) {
+      return;
+    }
     var id = self.sequenceID.get();
+    console.log('PING ID', id);
     var signal = MESSAGE_SIGNAL.REQUEST;
     var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING);
     sendMessage(id, signal, content);
@@ -221,15 +228,15 @@ var SimpleWRPC = function(connection) {
   //GROUP OF FUNCTIONS FOR RECEIVING REQUEST
 
   var subscriptionEventTarget = new EventEmitter();
-  this.subscribeToEvent = subscriptionEventTarget.on.bind(subscriptionEventTarget);
-  this.unsubscribeToEvent = subscriptionEventTarget.removeListener.bind(subscriptionEventTarget);
+  this.subscribeForEvent = subscriptionEventTarget.on.bind(subscriptionEventTarget);
+  this.unsubscribeForEvent = subscriptionEventTarget.removeListener.bind(subscriptionEventTarget);
 
   var methodCallEventTarget = new EventEmitter();
   this.addListenerToMethodCall = methodCallEventTarget.on.bind(methodCallEventTarget);
   this.removeListenerForMethodCall = methodCallEventTarget.removeListener.bind(methodCallEventTarget);
 
   // Subscribe to the request to close the socket from the server
-  this.subscribeToEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
+  this.subscribeForEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
     self.close(true);
   });
 
@@ -237,13 +244,14 @@ var SimpleWRPC = function(connection) {
     switch (request.type) {
       case MESSAGE_TYPE.ONE_WAY:
         sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
-        subscriptionEventTarget.emit(request.name, request.data);
+        subscriptionEventTarget.emit(request.name, {data: request.data});
       case MESSAGE_TYPE.TWO_WAY:
-        request.data = request.data || {};
-        request.data.done = function(data) {
-          sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
-        };
-        methodCallEventTarget.emit(request.name, request.data);
+        methodCallEventTarget.emit(request.name, {
+          data: request.data,
+          done: function(data) {
+            sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
+          }
+        });
     }
   }
 
@@ -379,6 +387,9 @@ var SimpleWRPCServer = function(options) {
         idMap[id].setConnection(connection);
       } else {
         idMap[id] = new SimpleWRPC(connection);
+        idMap[id].on('close', function() {
+          delete idMap[id];
+        });
         self.emit('connection', idMap[id]);
       }
     }
@@ -392,6 +403,13 @@ var SimpleWRPCServer = function(options) {
 
     // eventSystem.on('message', waitingForID);
   });
+
+  this.close = function() {
+    wss.close();
+    for (var id in idMap) {
+      idMap[id].close();
+    }
+  }
 };
 
 util.inherits(SimpleWRPCServer, EventEmitter);

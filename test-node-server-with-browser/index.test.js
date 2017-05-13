@@ -30,13 +30,13 @@ describe('Test Websocket module with Nodejs Server and Chrome Browser Client', f
   });
 
   it('Can send the signal to start Test1', function(done) {
-    conn.subscribeToEvent('test1', function() {
+    conn.subscribeForEvent('test1', function() {
       done();
     });
   });
 
   it('Can receive the event', function(done) {
-    conn.emitEvent('test1-receiving-event', {greeting: "hi! I am websocket server"}, function(error) {
+    conn.publishEvent('test1-receiving-event', {greeting: "hi! I am websocket server"}, function(error) {
       expect(error).to.not.be.ok
       done();
     });
@@ -57,13 +57,13 @@ describe('Test Websocket module with Nodejs Server and Chrome Browser Client', f
 });
 
 // bitmarkRPC.on('connection', function(conn) {
-//   conn.subscribeToEvent('mydata', function(data) {
+//   conn.subscribeForEvent('mydata', function(data) {
 //     console.log('I JUST RECEIVED MYDATA WITH DATA', data);
 //   });
 //   conn.addListenerToMethodCall('mymethod', function(event) {
 //     event.done({data: 'aaabc'});
 //   });
-//   conn.emitEvent('datafromserver', {a: 'aaa', b: 'bbb'}, function() {
+//   conn.publishEvent('datafromserver', {a: 'aaa', b: 'bbb'}, function() {
 //     console.log('Sent');
 //   });
 // });

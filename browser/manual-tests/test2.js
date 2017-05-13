@@ -3,12 +3,12 @@
 
     var socket = new SimpleWRPC('ws:\/\/127.0.0.1:3000\/');
 
-    socket.subscribeToEvent('datafromserver', function(e) {
+    socket.subscribeForEvent('datafromserver', function(e) {
       console.log('Receive data from server', e.detail);
     });
 
     setTimeout(function() {
-      socket.emitEvent('mydata', {one: 1, two: 2},  function(error, data) {
+      socket.publishEvent('mydata', {one: 1, two: 2},  function(error, data) {
         console.log('Send mydata successfully!!!');
       });
     }, 2000);

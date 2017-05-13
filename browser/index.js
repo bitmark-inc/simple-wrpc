@@ -77,7 +77,18 @@
   }
 
   Helper.createEvent = function(name, params) {
-    return new CustomEvent(name, {detail: params})
+    var event = new CustomEvent(name);
+    console.log('ASKED TO CREATE EVENT WITH ', name, params);
+    console.log('----------------');
+    if (params) {
+      for (var key in params) {
+        console.log(key);
+        console.log(params);
+        event[key] = params[key];
+      }
+    }
+    console.log('----------------');
+    return event;
   };
 
   Helper.TimeDecay = function(intervalInput, decayInput) {
@@ -113,7 +124,9 @@
         throw new Error('message content is required');
       }
       message.id = message.id.toString(); // make sure the id is string
-      callback[message.id] = message.callback;
+      if (message.callback) {
+        callback[message.id] = message.callback;
+      }
       messages.push(message);
     };
 
@@ -233,7 +246,7 @@
         id: id,
         signal: signal,
         content: content,
-        callback
+        callback: callback
       });
       self.connection.send(content);
     };
@@ -241,7 +254,7 @@
     //----------------------------------------------------
     // GROUP OF FUNCTIONS FOR SENDING REQUEST
 
-    this.emitEvent = function(name, params, callback) {
+    this.publishEvent = function(name, params, callback) {
       var id = self.sequenceID.get();
       var signal = MESSAGE_SIGNAL.REQUEST;
       var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
@@ -256,6 +269,9 @@
     };
 
     function sendPingRequest() {
+      if (self.readyState === STATE.CLOSE) {
+        return;
+      }
       var id = self.sequenceID.get();
       var signal = MESSAGE_SIGNAL.REQUEST;
       var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING);
@@ -276,15 +292,15 @@
     //GROUP OF FUNCTIONS FOR RECEIVING REQUEST
 
     var subscriptionEventTarget = document.createElement('div');
-    this.subscribeToEvent = subscriptionEventTarget.addEventListener.bind(subscriptionEventTarget);
-    this.unsubscribeToEvent = subscriptionEventTarget.removeEventListener.bind(subscriptionEventTarget);
+    this.subscribeForEvent = subscriptionEventTarget.addEventListener.bind(subscriptionEventTarget);
+    this.unsubscribeForEvent = subscriptionEventTarget.removeEventListener.bind(subscriptionEventTarget);
 
     var methodCallEventTarget = document.createElement('div');
     this.addListenerToMethodCall = methodCallEventTarget.addEventListener.bind(methodCallEventTarget);
     this.removeListenerForMethodCall = methodCallEventTarget.removeEventListener.bind(methodCallEventTarget);
 
     // Subscribe to the request to close the socket from the server
-    this.subscribeToEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
+    this.subscribeForEvent(PRESERVED_MESSAGE_NAME.CLOSE, function() {
       self.close(true);
     });
 
@@ -292,13 +308,14 @@
       switch (request.type) {
         case MESSAGE_TYPE.ONE_WAY:
           sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id));
-          subscriptionEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
+          subscriptionEventTarget.dispatchEvent(Helper.createEvent(request.name, {data: request.data}))
         case MESSAGE_TYPE.TWO_WAY:
-          request.data = request.data || {};
-          request.data.done = function(data) {
-            sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
-          };
-          methodCallEventTarget.dispatchEvent(Helper.createEvent(request.name, request.data))
+          methodCallEventTarget.dispatchEvent(Helper.createEvent(request.name, {
+            data: request.data,
+            done: function(data) {
+              sendMessage(request.id, MESSAGE_SIGNAL.RESPONSE, Helper.buildReponseMessage(request.id, data));
+            }
+          }));
       }
     }
 
