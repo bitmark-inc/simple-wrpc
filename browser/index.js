@@ -275,7 +275,6 @@
 
     var pingTimer;
     function onReceivingResponse(response) {
-      console.log(response);
       messagePool.callCallback(response.id, null, response.data);
       // receiving response means other messages before the corresponding requests are sent
       messagePool.removeMessageUntilID(response.id);

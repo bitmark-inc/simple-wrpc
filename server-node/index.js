@@ -208,7 +208,6 @@ var SimpleWRPC = function(connection) {
       return;
     }
     var id = self.sequenceID.get();
-    console.log('PING ID', id);
     var signal = MESSAGE_SIGNAL.REQUEST;
     var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, PRESERVED_MESSAGE_NAME.PING);
     sendMessage(id, signal, content);
@@ -380,7 +379,6 @@ var SimpleWRPCServer = function(options) {
 
   wss.on('connection', function(connection) {
     function waitingForID(id) {
-      console.log('id is ', id);
       connection.removeListener('message', waitingForID);
       if (idMap[id]) {
         idMap[id].setConnection(connection);
