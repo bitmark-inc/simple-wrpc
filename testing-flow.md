@@ -23,11 +23,11 @@ Client is be able to receive event `test4-receiving-method-call` with the data `
 ### Client emit event and method call
 TEST-05
 -- PORT 8204 --
-Client emits `test2-emit-event` with the data `{greeting: "hi! I am websocket client"}`
+Client emits `test5-emit-event` with the data `{greeting: "hi! I am websocket client"}`
 
 TEST-06
 -- PORT 8205 --
-- Client calls the method `test2-call-method` with the data `{ask: "server, how are you?"}` and then it will receive the result `{answer: "I am super!"}`
+- Client calls the method `test6-call-method` with the data `{ask: "server, how are you?"}` and then it will receive the result `{answer: "I am super!"}`
 
 
 
@@ -39,35 +39,33 @@ TEST-07
 
 - Event
   - Client
-    - event-client1 {greeting: "hello from client for event-client1"}
-    - event-client2  {greeting: "hello from client for event-client2"}
+    - test7-client-event-1 {greeting: "hello from client for client-event-1"}
+    - test7-client-event-2  {greeting: "hello from client for client-event-2"}
     - ...
-    - event-client100  {greeting: "hello from client for event-client100"}
+    - test7-client-event-100  {greeting: "hello from client for client-event-100"}
 
   - Server
-    - event-server1  {greeting: "hello from client for event-server1"}
-    - event-server2 {greeting: "hello from client for event-server2"}
+    - test7-server-event-1  {greeting: "hello from client for server-event-1"}
+    - test7-server-event-2 {greeting: "hello from client for server-event-2"}
     - ...
-    - event-server100 {greeting: "hello from client for event-server100"}
+    - test7-server-event-100 {greeting: "hello from client for server-event-100"}
 
 - Method call
   - From client:
-    - Client: call-client1 {ask: "From call-client1, how are you?"}
-    - Server: {answer: "For call-client1, I am so so}
-    - We loop this 100 times with increasing client<number> and random delay on server's answer
+    - Client: test7-client-call-1 {ask: "From client-call-1, how are you?"}
+    - Server: {answer: "For client-call-1, I am so so.}
+    - We loop this 100 times with increasing client-<number> and random delay on server's answer
 
   - From server:
-    - Server: call-server1 {ask: "From call-server1, how are you?"}
-    - Client: {answer: "For call-server1, I am so so}
-    - We loop this 100 times with  increasing server<number> and random delay on client's answer
+    - Server: test7-server-call-1 {ask: "From server-call-1, how are you?"}
+    - Client: {answer: "For server-call-1, I am so so}
+    - We loop this 100 times with  increasing server-<number> and random delay on client's answer
 
 ## Test2
 
 TEST-08
 -- PORT 8207 --
 
-- The client will emit the event "test2" to start the test
-
 - To test if the client can auto-reconnect and both sides can keep the data
 
-- Redo the `Massive event and method call` with randomly closing the connection.
+- Redo the `Massive event and method call` (TEST-07) with randomly closing the connection.

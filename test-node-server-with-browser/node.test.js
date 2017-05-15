@@ -21,97 +21,170 @@ Helper.portMapping = {
   'TEST-08': 8208
 }
 
-describe('Please start the client to test the feature', function() {
-  let conn = null;
-  this.timeout(120000);
+console.log('Please start the client to test the fetures');
 
-  let testName = 'TEST-01';
-  // it(testName, function(done) {
-  //   let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (WRPCClient) => {
-  //     WRPCClient.on('close', function() {
-  //       wrpcServer.close();
-  //       done();
-  //     });
-  //   });
-  // });
+// describe('Basic pub/sub and method call', () => {
+//   this.timeout(30000);
 
-  // testName = 'TEST-02';
-  // it(testName, function(done) {
-  //   let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (WRPCClient) => {
-  //     WRPCClient.close();
-  //     wrpcServer.close();
-  //     done();
-  //   });
-  // });
+//   let testName = 'TEST-01';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       swrpcConn.on('close', function() {
+//         wrpcServer.close();
+//         done();
+//       });
+//     });
+//   });
 
-  // testName = 'TEST-03';
-  // it(testName, function(done) {
-  //   let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (WRPCClient) => {
-  //     let testFinished = false;
-  //     WRPCClient.publishEvent(`test3-receiving-event`, {greeting: "hi! I am websocket server"}, () => {
-  //       testFinished = true;
-  //     });
-  //     WRPCClient.on('close', () => {
-  //       expect(testFinished).to.equal(true);
-  //       wrpcServer.close();
-  //       done();
-  //     })
-  //   });
-  // });
+//   testName = 'TEST-02';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       swrpcConn.close();
+//       wrpcServer.close();
+//       done();
+//     });
+//   });
 
-  testName = 'TEST-04';
-  it(testName, function(done) {
-    let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (WRPCClient) => {
-      let testFinished = false;
+//   testName = 'TEST-03';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       let testFinished = false;
+//       swrpcConn.publishEvent(`test3-receiving-event`, {greeting: "hi! I am websocket server"}, () => {
+//         testFinished = true;
+//       });
+//       swrpcConn.on('close', () => {
+//         expect(testFinished).to.equal(true);
+//         wrpcServer.close();
+//         done();
+//       })
+//     });
+//   });
 
-      WRPCClient.callMethod(`test4-receiving-method-call`, {ask: "client, how are you?"}, (error, data) => {
-        expect(error).to.not.be.ok;
-        expect(data).to.deep.equal({answer: "I am fine."});
-        testFinished = true;
+//   testName = 'TEST-04';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       let testFinished = false;
+
+//       swrpcConn.callMethod(`test4-receiving-method-call`, {ask: "client, how are you?"}, (error, data) => {
+//         expect(error).to.not.be.ok;
+//         expect(data).to.deep.equal({answer: "I am fine."});
+//         testFinished = true;
+//       });
+//       swrpcConn.on('close', () => {
+//         expect(testFinished).to.equal(true);
+//         wrpcServer.close();
+//         done();
+//       })
+//     });
+//   });
+
+
+//   testName = 'TEST-05';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       let testFinished = false;
+
+//       swrpcConn.subscribeForEvent(`test5-emit-event`, (event) => {
+//         expect(event.data).to.deep.equal({greeting: "hi! I am websocket client"});
+//         testFinished = true;
+//       });
+//       swrpcConn.on('close', () => {
+//         expect(testFinished).to.equal(true);
+//         wrpcServer.close();
+//         done();
+//       })
+//     });
+//   });
+
+//   testName = 'TEST-06';
+//   it(testName, function(done) {
+//     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+//       let testFinished = false;
+
+//       swrpcConn.addListenerToMethodCall(`test6-call-method`, (event) => {
+//         expect(event.data).to.deep.equal({ask: "server, how are you?"});
+//         event.done({answer: "I am fine."});
+//         testFinished = true;
+//       });
+//       swrpcConn.on('close', () => {
+//         expect(testFinished).to.equal(true);
+//         wrpcServer.close();
+//         done();
+//       })
+//     });
+//   });
+
+// });
+
+describe('Massive messages test', function() {
+  this.timeout(90000);
+
+  let massiveMessagesTestHelper = {
+    getRandomInt: (min, max) => {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+    addEventHandler: (index, swrpcConn, callback) => {
+      swrpcConn.subscribeForEvent(`test7-client-event-${index}`, (event) => {
+        expect(event.data).to.deep.equal({greeting: `hello from client for client-event-${index}`});
+        callback();
       });
-      WRPCClient.on('close', () => {
-        expect(testFinished).to.equal(true);
+    },
+    publishEvent: (index, wrpcConn, callback) => {
+      setTimeout(() => {
+        wrpcConn.publishEvent(`test7-server-event-${index}`, {greeting: `hello from server for server-event-${index}`}, callback);
+      }, massiveMessagesTestHelper.getRandomInt(0,10000));
+    },
+    addMethodCallHandler: (index, wrpcConn, callback) => {
+      wrpcConn.addListenerToMethodCall(`test7-client-call-${index}`, (event) => {
+        expect(event.data).to.deep.equal({ask: `From client-call-${index}, how are you?`});
+        event.done({answer: `For client-call-${index}, I am so so.`});
+        callback();
+      });
+    },
+    callMethod: (index, wrpcConn, callback) => {
+      setTimeout(() => {
+        wrpcConn.callMethod(`test7-server-call-${index}`, {ask: `From server-call-${index}, how are you?`}, (error, data) => {
+          expect(error).to.not.be.ok;
+          expect(data).to.deep.equal({answer: `For server-call-${index}, I am so so.`});
+          callback();
+        });
+      }, massiveMessagesTestHelper.getRandomInt(0,10000));
+    }
+  };
+
+  let testName = 'TEST-07';
+  it('Should handle massive event and method call correctly', (done) => {
+    let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
+      let loop = 100;
+      let totalEventReceived = 0;
+      let totalEventPublished = 0;
+      let totalMethodCallReceived = 0;
+      let totalMethodCalled = 0;
+
+      for (let i = 1; i <= loop; i++) {
+        massiveMessagesTestHelper.addEventHandler(i, swrpcConn, () => {
+          totalEventReceived++;
+        });
+        massiveMessagesTestHelper.publishEvent(i, swrpcConn, () => {
+          totalEventPublished++;
+        });
+        massiveMessagesTestHelper.addMethodCallHandler(i, swrpcConn, () => {
+          totalMethodCallReceived++;
+        });
+        massiveMessagesTestHelper.callMethod(i, swrpcConn, () => {
+          totalMethodCalled++;
+        });
+      }
+
+      swrpcConn.on('close', () => {
+        expect(totalEventReceived).to.equal(loop);
+        expect(totalEventPublished).to.equal(loop);
+        expect(totalMethodCallReceived).to.equal(loop);
+        expect(totalMethodCalled).to.equal(loop);
         wrpcServer.close();
         done();
-      })
+      });
     });
   });
 
-
-  // it('Can finish Test1', function(done) {
-  //   conn.subscribeForEvent('test1', function() {
-  //   });
-  // });
-
-  // it('Can receive the event', function(done) {
-  //   conn.publishEvent('test1-receiving-event', {greeting: "hi! I am websocket server"}, function(error) {
-  //     expect(error).to.not.be.ok
-  //     done();
-  //   });
-  // });
-
-  // describe('Test1', function() {
-  //   it('should allow me to test1', function() {
-  //     expect(1).to.equal(1);
-  //   });
-  //   it('should allow me to test2', function() {
-  //     expect(2).to.equal(2);
-  //   });
-  //   it('should wait for karma', function(done) {
-  //     setTimeout(done, 15000);
-  //   });
-  // });
-
 });
-
-// bitmarkRPC.on('connection', function(conn) {
-//   conn.subscribeForEvent('mydata', function(data) {
-//     console.log('I JUST RECEIVED MYDATA WITH DATA', data);
-//   });
-//   conn.addListenerToMethodCall('mymethod', function(event) {
-//     event.done({data: 'aaabc'});
-//   });
-//   conn.publishEvent('datafromserver', {a: 'aaa', b: 'bbb'}, function() {
-//     console.log('Sent');
-//   });
-// });

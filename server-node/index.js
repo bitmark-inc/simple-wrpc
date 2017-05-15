@@ -191,7 +191,6 @@ var SimpleWRPC = function(connection) {
 
   this.publishEvent = function(name, params, callback) {
     var id = self.sequenceID.get();
-    console.log('EVENT ID', id);
     var signal = MESSAGE_SIGNAL.REQUEST;
     var content = Helper.buildRequestMessage(id, MESSAGE_TYPE.ONE_WAY, name, params);
     sendMessage(id, signal, content, callback);

@@ -78,16 +78,11 @@
 
   Helper.createEvent = function(name, params) {
     var event = new CustomEvent(name);
-    console.log('ASKED TO CREATE EVENT WITH ', name, params);
-    console.log('----------------');
     if (params) {
       for (var key in params) {
-        console.log(key);
-        console.log(params);
         event[key] = params[key];
       }
     }
-    console.log('----------------');
     return event;
   };
 
