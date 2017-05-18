@@ -91,18 +91,6 @@ describe('Basic pub/sub and method call', function() {
     });
   });
 
-  // testName = 'TEST-07';
-  // it(testName, function(done) {
-  //   let wrpc = Helper.createSocketConnection(Helper.portMapping[testName], () => {
-  //     wrpc.addListenerToMethodCall('test7-server-call', (event) => {
-  //       expect(event.data).to.deep.equal({ask: "client, how are you?"});
-  //       wrpc.connection.close();
-  //       event.done({answer: "I am fine."});
-  //       done();
-  //     });
-  //   })
-  // });
-
 });
 
 
@@ -157,7 +145,7 @@ describe('Massive messages test', function() {
     }
   }
 
-  let testName = 'TEST-09';
+  let testName = 'TEST-07';
   it(testName, function(done) {
     let loop = 100;
     let totalEventPublished = 0;
@@ -193,7 +181,7 @@ describe('Massive messages test', function() {
     });
   });
 
-  // testName = 'TEST-08';
+  // testName = 'TEST-10';
   // it(testName, function(done) {
   //   let loop = 5;
   //   let totalEventPublished = 0;
@@ -226,15 +214,6 @@ describe('Massive messages test', function() {
   //         checkTestFinish();
   //       });
   //     }
-
-  //     for (let i = 1; i <= 4; i++) {
-  //       setTimeout(function() {
-  //         console.log('SHOULD CLOSE ===================================================================');
-  //         wrpc.connection.close();
-  //       }, i*15000);
-  //     }
   //   });
   // });
-
-
 });

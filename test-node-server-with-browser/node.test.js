@@ -18,8 +18,7 @@ Helper.portMapping = {
   'TEST-05': 8205,
   'TEST-06': 8206,
   'TEST-07': 8207,
-  'TEST-08': 8208,
-  'TEST-09': 8209
+  'TEST-08': 8208
 }
 
 console.log('Please start the client to test the fetures');
@@ -114,22 +113,6 @@ describe('Basic pub/sub and method call', function() {
       })
     });
   });
-
-  // testName = 'TEST-07';
-  // it(testName, function(done) {
-  //   let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
-  //     let testFinished = false;
-
-  //     swrpcConn.callMethod(`test9-server-call`, {ask: "client, how are you?"}, (error, data) => {
-  //       expect(error).to.not.be.ok;
-  //       expect(data).to.deep.equal({answer: "I am fine."});
-  //       swrpcConn.close();
-  //       wrpcServer.close();
-  //       done();
-  //     });
-  //   });
-  // });
-
 });
 
 describe('Massive messages test', function() {
@@ -168,7 +151,7 @@ describe('Massive messages test', function() {
     }
   };
 
-  let testName = 'TEST-09';
+  let testName = 'TEST-07';
   it(testName, (done) => {
     let wrpcServer = Helper.createWRPCServer(Helper.portMapping[testName], (swrpcConn) => {
       let loop = 100;
